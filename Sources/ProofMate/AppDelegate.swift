@@ -4,9 +4,11 @@ import ProofMateCore
 
 let log = Logger(subsystem: "com.hari.proofmate", category: "app")
 
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private let hotkey = HotkeyManager()
+    private let popover = PopoverController()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -25,6 +27,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 do {
                     let text = try await TextCapture.selectedText()
                     log.info("captured \(text.count) characters")
+                    let fake = text.replacingOccurrences(of: "hello", with: "Hello")
+                    self.popover.show(.result(
+                        original: text,
+                        corrected: fake,
+                        segments: WordDiff.diff(original: text, corrected: fake)
+                    ))
                 } catch {
                     log.error("capture failed: \(String(describing: error))")
                 }
