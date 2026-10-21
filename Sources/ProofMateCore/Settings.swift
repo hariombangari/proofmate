@@ -42,7 +42,8 @@ public struct Settings: Codable, Equatable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let d = Settings.defaults
         model = try c.decodeIfPresent(String.self, forKey: .model) ?? d.model
-        endpoint = try c.decodeIfPresent(URL.self, forKey: .endpoint) ?? d.endpoint
+        endpoint = try c.decodeIfPresent(String.self, forKey: .endpoint)
+            .flatMap(Settings.parseEndpoint) ?? d.endpoint
         timeoutSeconds = try c.decodeIfPresent(Double.self, forKey: .timeoutSeconds) ?? d.timeoutSeconds
         let decodedHotkey = try c.decodeIfPresent(Hotkey.self, forKey: .hotkey) ?? d.hotkey
         hotkey = decodedHotkey.isValid ? decodedHotkey : d.hotkey
@@ -50,12 +51,19 @@ public struct Settings: Codable, Equatable {
             ?? d.hasCompletedOnboarding
     }
 
-    /// Accepts a full http(s) URL with a host, e.g. "http://localhost:11434". Trims whitespace.
+    /// Accepts a bare http(s) base URL with a host, e.g. "http://localhost:11434". Trims whitespace.
+    /// Rejects a path, query, fragment, or credentials: OllamaEngine appends "api/chat" to the
+    /// endpoint, and credentials would be saved in plain text.
     public static func parseEndpoint(_ text: String) -> URL? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let url = URL(string: trimmed),
               let scheme = url.scheme?.lowercased(), ["http", "https"].contains(scheme),
-              let host = url.host, !host.isEmpty else { return nil }
+              let host = url.host, !host.isEmpty,
+              let parts = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              parts.query == nil, parts.fragment == nil,
+              parts.user == nil, parts.password == nil,
+              parts.path.isEmpty || parts.path == "/" else { return nil }
+        if let port = parts.port, !(1...65535).contains(port) { return nil }
         return url
     }
 

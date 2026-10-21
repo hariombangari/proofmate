@@ -91,5 +91,22 @@ final class SettingsTests: XCTestCase {
         XCTAssertNil(Settings.parseEndpoint("ftp://localhost"))
         XCTAssertNil(Settings.parseEndpoint("http://"))
         XCTAssertNil(Settings.parseEndpoint(""))
+        XCTAssertNil(Settings.parseEndpoint("http://localhost:11434/v1"))
+        XCTAssertNil(Settings.parseEndpoint("http://localhost:11434/?x=1"))
+        XCTAssertNil(Settings.parseEndpoint("http://localhost:11434/#f"))
+        XCTAssertNil(Settings.parseEndpoint("http://user:pw@localhost:11434"))
+        XCTAssertNil(Settings.parseEndpoint("http://localhost:99999"))
+    }
+
+    func testParseEndpointAcceptsIPv6AndTrailingSlash() {
+        XCTAssertEqual(Settings.parseEndpoint("http://[::1]:11434")?.absoluteString, "http://[::1]:11434")
+        XCTAssertEqual(Settings.parseEndpoint("http://localhost:11434/")?.absoluteString, "http://localhost:11434/")
+    }
+
+    func testInvalidEndpointFallsBackToDefault() throws {
+        let url = tempDir.appendingPathComponent("settings.json")
+        try #"{"endpoint": "localhost:11434"}"#.write(to: url, atomically: true, encoding: .utf8)
+        let settings = try Settings.load(from: url)
+        XCTAssertEqual(settings.endpoint, Settings.defaults.endpoint)
     }
 }

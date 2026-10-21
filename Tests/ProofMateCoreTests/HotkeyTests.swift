@@ -57,6 +57,7 @@ final class HotkeyTests: XCTestCase {
 
     func testIsValid() {
         XCTAssertTrue(Hotkey.defaultCheck.isValid)
+        XCTAssertTrue(Hotkey(keyCode: 5, carbonModifiers: 256 | 512, key: "G").isValid)
         XCTAssertFalse(Hotkey(keyCode: 5, carbonModifiers: 512, key: "G").isValid)
         XCTAssertFalse(Hotkey(keyCode: 5, carbonModifiers: 256, key: "").isValid)
     }
