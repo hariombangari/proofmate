@@ -5,55 +5,84 @@ import ProofMateCore
 let log = Logger(subsystem: "com.hari.proofmate", category: "app")
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem!
     private let hotkey = HotkeyManager()
-    private var coordinator: Coordinator!
     private let store = SettingsStore()
+    private var coordinator: Coordinator!
+    private var setup: SetupWindowController!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        coordinator = Coordinator(store: store, openSetup: { [weak self] in self?.openSettings() })
+        let setupModel = SetupModel(
+            store: store,
+            registerHotkey: { [weak self] in self?.registerHotkey($0) },
+            unregisterHotkey: { [weak self] in self?.hotkey.unregister() }
+        )
+        setup = SetupWindowController(model: setupModel)
+        coordinator = Coordinator(store: store, openSetup: { [weak self] in self?.setup.show() })
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = NSImage(
             systemSymbolName: "text.badge.checkmark",
             accessibilityDescription: "ProofMate"
         )
-        statusItem.menu = makeMenu()
+        let menu = NSMenu()
+        menu.delegate = self
+        statusItem.menu = menu
 
-        hotkey.onPress = { [weak self] in self?.coordinator.checkSelection() }
-        do {
-            try hotkey.register(store.settings.hotkey)
-        } catch {
-            log.error("hotkey registration failed: \(String(describing: error))")
-        }
+        hotkey.onPress = { [weak self] in self?.hotkeyPressed() }
+        _ = registerHotkey(store.settings.hotkey)
 
         log.info("ProofMate \(ProofMateVersion.current, privacy: .public) launched with model \(self.store.settings.model, privacy: .public)")
+
+        if !store.settings.hasCompletedOnboarding {
+            setup.show()
+        }
     }
 
-    private func makeMenu() -> NSMenu {
-        let menu = NSMenu()
-        menu.addItem(withTitle: "ProofMate \(ProofMateVersion.current) · \(store.settings.model)", action: nil, keyEquivalent: "")
+    /// Returns a user-facing error message, or nil on success.
+    private func registerHotkey(_ shortcut: Hotkey) -> String? {
+        do {
+            try hotkey.register(shortcut)
+            return nil
+        } catch {
+            log.error("hotkey registration failed for \(shortcut.displayString, privacy: .public): \(String(describing: error))")
+            return "Could not register \(shortcut.displayString). Choose another shortcut."
+        }
+    }
+
+    private func hotkeyPressed() {
+        if setup.isVisible {
+            setup.hotkeyPressed()
+        } else {
+            coordinator.checkSelection()
+        }
+    }
+
+    // MARK: - Menu
+
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        menu.removeAllItems()
+        let settings = store.settings
+        menu.addItem(withTitle: "ProofMate \(ProofMateVersion.current) · \(settings.model)", action: nil, keyEquivalent: "")
         menu.addItem(.separator())
-
-        let check = NSMenuItem(title: "Check Selection  \(store.settings.hotkey.displayString)", action: #selector(checkSelection), keyEquivalent: "")
-        check.target = self
-        menu.addItem(check)
-
-        let open = NSMenuItem(title: "Open Settings File", action: #selector(openSettings), keyEquivalent: "")
-        open.target = self
-        menu.addItem(open)
-
+        menu.addItem(item("Check Selection  \(settings.hotkey.displayString)", #selector(checkSelection)))
+        menu.addItem(item("Settings…", #selector(openSetup), key: ","))
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
-        return menu
+        menu.addItem(withTitle: "Quit ProofMate", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+    }
+
+    private func item(_ title: String, _ action: Selector, key: String = "") -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: key)
+        item.target = self
+        return item
     }
 
     @objc private func checkSelection() {
         coordinator.checkSelection()
     }
 
-    @objc private func openSettings() {
-        NSWorkspace.shared.open(Settings.defaultFileURL)
+    @objc private func openSetup() {
+        setup.show()
     }
 }

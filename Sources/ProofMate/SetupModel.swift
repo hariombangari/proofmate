@@ -75,6 +75,7 @@ final class SetupModel: ObservableObject {
     func startMonitoring() {
         pollAccessibility()
         launchAtLogin = SMAppService.mainApp.status == .enabled
+        if launchAtLogin { launchAtLoginError = nil }
         pollTimer?.invalidate()
         pollTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.pollAccessibility() }
