@@ -5,6 +5,12 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+BUILD_NUMBER="${BUILD_NUMBER:-1}"
+if ! [[ "$BUILD_NUMBER" =~ ^[0-9]+(\.[0-9]+)*$ ]]; then
+    echo "BUILD_NUMBER must be digits and dots, got: $BUILD_NUMBER" >&2
+    exit 1
+fi
+
 VERSION=$(scripts/version.sh)
 ARCH_FLAGS=()
 if [ "${UNIVERSAL:-0}" = "1" ]; then
@@ -20,7 +26,7 @@ mkdir -p "$APP/Contents/MacOS"
 cp "$BIN_DIR/ProofMate" "$APP/Contents/MacOS/ProofMate"
 cp "Resources/Info.plist" "$APP/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$APP/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${BUILD_NUMBER:-1}" "$APP/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$APP/Contents/Info.plist"
 
 # Prefer a local self-signed "ProofMate Dev" identity: its designated requirement is
 # stable across rebuilds, so the Accessibility grant survives. Ad-hoc signatures change

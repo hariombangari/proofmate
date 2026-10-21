@@ -3,7 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 VERSION_FILE="Sources/ProofMateCore/Version.swift"
-VERSION=$(sed -n 's/.*static let current = "\(.*\)".*/\1/p' "$VERSION_FILE")
+VERSION=$(sed -n 's/.*static let current = "\([^"]*\)".*/\1/p' "$VERSION_FILE" | head -1)
 if [ -z "$VERSION" ]; then
     echo "Could not read version from $VERSION_FILE" >&2
     exit 1
