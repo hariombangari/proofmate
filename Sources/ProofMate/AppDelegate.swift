@@ -16,7 +16,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         statusItem.menu = makeMenu()
 
-        hotkey.onPress = { log.info("hotkey pressed") }
+        hotkey.onPress = {
+            Task { @MainActor in
+                guard TextCapture.ensureAccessibility(prompt: true) else {
+                    log.error("accessibility not granted")
+                    return
+                }
+                do {
+                    let text = try await TextCapture.selectedText()
+                    log.info("captured \(text.count) characters")
+                } catch {
+                    log.error("capture failed: \(String(describing: error))")
+                }
+            }
+        }
         do {
             try hotkey.register()
         } catch {
