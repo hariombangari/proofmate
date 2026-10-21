@@ -27,7 +27,7 @@ final class OllamaDiscoveryTests: XCTestCase {
         let request = try XCTUnwrap(captured)
         XCTAssertEqual(request.url?.absoluteString, "http://localhost:11434/api/version")
         XCTAssertEqual(request.httpMethod, "GET")
-        XCTAssertEqual(request.timeoutInterval, 3)
+        XCTAssertEqual(request.timeoutInterval, OllamaEngine.probeTimeout)
     }
 
     func testInstalledModelsDecodesNameAndSize() async throws {
@@ -73,6 +73,16 @@ final class OllamaDiscoveryTests: XCTestCase {
             XCTFail("expected throw")
         } catch {
             XCTAssertEqual(error as? EngineError, .http(500))
+        }
+    }
+
+    func testTagsNotFoundIsHTTPNotModelMissing() async {
+        StubURLProtocol.handler = respond(404, "")
+        do {
+            _ = try await engine().installedModels()
+            XCTFail("expected throw")
+        } catch {
+            XCTAssertEqual(error as? EngineError, .http(404))
         }
     }
 }

@@ -1,6 +1,6 @@
 import Foundation
 
-public struct OllamaModel: Equatable, Decodable {
+public struct OllamaModel: Equatable, Decodable, Sendable {
     public let name: String
     public let size: Int64
 

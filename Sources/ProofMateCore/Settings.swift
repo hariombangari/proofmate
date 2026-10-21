@@ -1,6 +1,6 @@
 import Foundation
 
-public struct Settings: Codable, Equatable {
+public struct Settings: Codable, Equatable, Sendable {
     public var model: String
     public var endpoint: URL
     public var timeoutSeconds: Double
