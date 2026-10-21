@@ -4,14 +4,20 @@ on:
   push:
     tags: ["v*"]
 
-permissions:
-  contents: write
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   release:
     runs-on: macos-15
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      XCODE_APP: /Applications/Xcode_16.4.app
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Check tag matches Version.swift
         run: |
@@ -20,6 +26,9 @@ jobs:
             echo "Tag $GITHUB_REF_NAME does not match version $VERSION in Sources/ProofMateCore/Version.swift" >&2
             exit 1
           fi
+
+      - name: Select Xcode
+        run: sudo xcode-select -s "$XCODE_APP" && swift --version
 
       - name: Unit tests
         run: swift test
@@ -35,10 +44,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION=$(scripts/version.sh)
-          sed "s/<version>/$VERSION/g" .github/release-notes.md > build/release-notes.md
-          gh release create "$GITHUB_REF_NAME" \
-            "build/ProofMate-$VERSION.dmg" \
-            "build/ProofMate-$VERSION.dmg.sha256" \
-            --title "ProofMate $VERSION" \
-            --notes-file build/release-notes.md \
-            --generate-notes
+          DMG="build/ProofMate-$VERSION.dmg"
+          SUM="$DMG.sha256"
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "Release $GITHUB_REF_NAME exists; replacing its assets."
+            gh release upload "$GITHUB_REF_NAME" "$DMG" "$SUM" --clobber
+          else
+            sed "s/<version>/$VERSION/g" .github/release-notes.md > build/release-notes.md
+            gh release create "$GITHUB_REF_NAME" "$DMG" "$SUM" \
+              --title "ProofMate $VERSION" \
+              --notes-file build/release-notes.md \
+              --generate-notes
+          fi
