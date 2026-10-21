@@ -35,9 +35,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION=$(scripts/version.sh)
+          sed "s/<version>/$VERSION/g" .github/release-notes.md > build/release-notes.md
           gh release create "$GITHUB_REF_NAME" \
             "build/ProofMate-$VERSION.dmg" \
             "build/ProofMate-$VERSION.dmg.sha256" \
             --title "ProofMate $VERSION" \
-            --notes-file .github/release-notes.md \
+            --notes-file build/release-notes.md \
             --generate-notes
