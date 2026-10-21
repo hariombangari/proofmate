@@ -112,13 +112,14 @@ final class Coordinator {
     // MARK: - Error mapping
 
     private func errorState(for error: EngineError, retrying text: String) -> PopoverState {
+        let message = error.userMessage(endpoint: settings.endpoint, timeoutSeconds: settings.timeoutSeconds)
         let retry = ErrorAction(title: "Retry") { [weak self] in
             Task { await self?.correct(text) }
         }
         switch error {
         case .notRunning:
             return .error(
-                message: "Ollama is not running at \(settings.endpoint.absoluteString).",
+                message: message,
                 action: ErrorAction(title: "Start Ollama") { [weak self] in
                     NSWorkspace.shared.open(URL(fileURLWithPath: "/Applications/Ollama.app"))
                     Task {
@@ -127,20 +128,16 @@ final class Coordinator {
                     }
                 }
             )
-        case .modelMissing(let model):
+        case .modelMissing:
             return .error(
-                message: "Model \"\(model)\" is not installed. Pick an installed model or run:  ollama pull \(model)",
+                message: message,
                 action: ErrorAction(title: "Open Setup") { [weak self] in
                     self?.popover.hide()
                     self?.openSetup()
                 }
             )
-        case .timeout:
-            return .error(message: "The model took longer than \(Int(settings.timeoutSeconds))s.", action: retry)
-        case .http(let code):
-            return .error(message: "Ollama returned HTTP \(code).", action: retry)
-        case .badResponse(let detail):
-            return .error(message: "Bad response from Ollama: \(detail)", action: retry)
+        case .timeout, .http, .badResponse:
+            return .error(message: message, action: retry)
         }
     }
 }
