@@ -3,6 +3,6 @@ import XCTest
 
 final class VersionTests: XCTestCase {
     func testVersionIsSemver() {
-        XCTAssertEqual(ProofMateVersion.current, "0.1.0")
+        XCTAssertEqual(ProofMateVersion.current, "0.2.0")
     }
 }
