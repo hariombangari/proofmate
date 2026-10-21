@@ -1,4 +1,5 @@
 import AppKit
+import Carbon
 import Combine
 import ProofMateCore
 import ServiceManagement
@@ -34,6 +35,7 @@ final class SetupModel: ObservableObject {
     @Published var endpointText: String
     @Published private(set) var endpointError: String?
     @Published private(set) var launchAtLogin = SMAppService.mainApp.status == .enabled
+    @Published private(set) var launchAtLoginError: String?
 
     let store: SettingsStore
     /// Registers the given hotkey as the global shortcut, replacing any registered one.
@@ -45,6 +47,8 @@ final class SetupModel: ObservableObject {
     private var pollTimer: Timer?
     private var keyMonitor: Any?
     private var storeChanges: AnyCancellable?
+    /// Bumped by each `refreshOllama` call, so an older, slower refresh cannot overwrite a newer one.
+    private var refreshGeneration = 0
 
     init(store: SettingsStore,
          registerHotkey: @escaping (Hotkey) -> String?,
@@ -70,6 +74,7 @@ final class SetupModel: ObservableObject {
 
     func startMonitoring() {
         pollAccessibility()
+        launchAtLogin = SMAppService.mainApp.status == .enabled
         pollTimer?.invalidate()
         pollTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.pollAccessibility() }
@@ -102,20 +107,31 @@ final class SetupModel: ObservableObject {
     // MARK: - Ollama and models
 
     func refreshOllama() async {
-        ollama = .checking
+        refreshGeneration += 1
+        let generation = refreshGeneration
+        // Keep the model picker visible while re-checking a running server.
+        if case .running = ollama {} else { ollama = .checking }
         let engine = OllamaEngine(settings: settings)
         do {
             let version = try await engine.serverVersion()
             let installed = try await engine.installedModels()
+            guard generation == refreshGeneration else { return }
             ollama = .running(version: version)
             models = ModelAdvisor.assess(installed)
         } catch EngineError.notRunning {
+            guard generation == refreshGeneration else { return }
             ollama = Self.isOllamaInstalled() ? .notRunning : .notInstalled
             models = []
         } catch {
-            ollama = .error("Could not reach Ollama: \(String(describing: error))")
+            guard generation == refreshGeneration else { return }
+            ollama = .error(message(for: error))
             models = []
         }
+    }
+
+    private func message(for error: Error) -> String {
+        guard let engineError = error as? EngineError else { return error.localizedDescription }
+        return engineError.userMessage(endpoint: settings.endpoint, timeoutSeconds: settings.timeoutSeconds)
     }
 
     static func isOllamaInstalled() -> Bool {
@@ -183,7 +199,7 @@ final class SetupModel: ObservableObject {
     }
 
     private func handleRecording(_ event: NSEvent) {
-        if event.keyCode == 53 { // Escape cancels and keeps the old shortcut
+        if event.keyCode == UInt16(kVK_Escape) { // Escape cancels and keeps the old shortcut
             stopRecording()
             return
         }
@@ -199,8 +215,12 @@ final class SetupModel: ObservableObject {
         endRecording()
         // Register before saving, so a rejected shortcut never reaches disk.
         if let error = registerHotkey(candidate) {
-            hotkeyError = "\(error) Kept \(settings.hotkey.displayString)."
-            _ = registerHotkey(settings.hotkey)
+            let old = settings.hotkey.displayString
+            if registerHotkey(settings.hotkey) == nil {
+                hotkeyError = "\(error) Kept \(old)."
+            } else {
+                hotkeyError = "\(error) Also could not restore \(old): choose another shortcut."
+            }
             return
         }
         store.update { $0.hotkey = candidate }
@@ -221,8 +241,15 @@ final class SetupModel: ObservableObject {
             } else {
                 try SMAppService.mainApp.unregister()
             }
+            launchAtLoginError = nil
         } catch {
             log.error("launch at login change failed: \(String(describing: error))")
+            if SMAppService.mainApp.status == .requiresApproval {
+                launchAtLoginError = "Approve ProofMate in System Settings → General → Login Items."
+                SMAppService.openSystemSettingsLoginItems()
+            } else {
+                launchAtLoginError = "Could not change Launch at Login: \(error.localizedDescription)"
+            }
         }
         launchAtLogin = SMAppService.mainApp.status == .enabled
     }
@@ -231,8 +258,10 @@ final class SetupModel: ObservableObject {
 
     func tryIt() async {
         tryState = .running
+        let model = settings.model
         do {
             let raw = try await OllamaEngine(settings: settings).correct(Self.sampleText)
+            guard settings.model == model else { return } // selectModel already reset tryState
             switch OutputCleaner.clean(raw, original: Self.sampleText) {
             case .success(let fixed):
                 tryState = .result(fixed)
@@ -240,7 +269,8 @@ final class SetupModel: ObservableObject {
                 tryState = .failed("The model returned an unusable answer. Try another model.")
             }
         } catch {
-            tryState = .failed("Failed: \(String(describing: error))")
+            guard settings.model == model else { return }
+            tryState = .failed(message(for: error))
         }
     }
 }
