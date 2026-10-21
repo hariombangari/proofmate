@@ -1,3 +1,7 @@
-import ProofMateCore
+import AppKit
 
-print("ProofMate \(ProofMateVersion.current)")
+let app = NSApplication.shared
+let delegate = AppDelegate()
+app.delegate = delegate
+app.setActivationPolicy(.accessory)
+app.run()
