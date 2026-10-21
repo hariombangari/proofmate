@@ -2,7 +2,7 @@ import XCTest
 @testable import ProofMateCore
 
 final class ModelAdvisorTests: XCTestCase {
-    private func model(_ name: String) -> OllamaModel { OllamaModel(name: name, size: 1) }
+    private func model(_ name: String) -> OllamaModel { OllamaModel(name: name, size: 5_000_000_000) }
 
     func testProseModelsAreRecommended() {
         for name in ["qwen3:8b", "qwen3:14b", "gemma3:12b", "llama3.1:8b", "mistral:7b"] {
@@ -37,5 +37,20 @@ final class ModelAdvisorTests: XCTestCase {
             model("qwen2.5-coder:14b"), model("llama2:7b"), model("qwen3:8b"), model("gemma3:12b"),
         ])
         XCTAssertEqual(result.map(\.model.name), ["qwen3:8b", "gemma3:12b", "llama2:7b", "qwen2.5-coder:14b"])
+    }
+
+    func testSmallProseModelsAreOnlyUsable() {
+        XCTAssertEqual(ModelAdvisor.assess([OllamaModel(name: "qwen3:0.6b", size: 522_000_000)])[0].fit, .usable)
+        XCTAssertEqual(ModelAdvisor.assess([OllamaModel(name: "qwen3:8b", size: 5_000_000_000)])[0].fit, .recommended)
+    }
+
+    func testNonProseMarkerWinsOverProseFamily() {
+        for name in ["llava-llama3:8b", "llama3.2-vision:11b"] {
+            XCTAssertEqual(ModelAdvisor.fit(for: name), .notForProse, name)
+        }
+    }
+
+    func testSuggestedPullIsRecommended() {
+        XCTAssertEqual(ModelAdvisor.fit(for: ModelAdvisor.suggestedPull), .recommended)
     }
 }

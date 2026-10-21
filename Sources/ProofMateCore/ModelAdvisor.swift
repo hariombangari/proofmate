@@ -24,6 +24,8 @@ public enum ModelAdvisor {
 
     static let proseFamilies = ["qwen3", "gemma3", "gemma2", "llama3", "mistral", "phi4"]
     static let nonProseMarkers = ["coder", "code", "embed", "llava", "vision", "minilm", "bge"]
+    /// Prose-family models below about 2 GB (e.g. qwen3:0.6b, gemma3:1b) proofread poorly.
+    static let minimumRecommendedBytes: Int64 = 2_000_000_000
 
     public static func fit(for name: String) -> ModelFit {
         let base = (name.split(separator: "/").last.map(String.init) ?? name).lowercased()
@@ -32,10 +34,17 @@ public enum ModelAdvisor {
         return .usable
     }
 
+    /// Like `fit(for:)` on the name, but a tiny prose model is only `.usable`.
+    static func fit(for model: OllamaModel) -> ModelFit {
+        let byName = fit(for: model.name)
+        if byName == .recommended && model.size < minimumRecommendedBytes { return .usable }
+        return byName
+    }
+
     /// Recommended first, then usable, then not-for-prose. Server order is kept within each group.
     public static func assess(_ models: [OllamaModel]) -> [ModelSuggestion] {
         models
-            .map { ModelSuggestion(model: $0, fit: fit(for: $0.name)) }
+            .map { ModelSuggestion(model: $0, fit: fit(for: $0)) }
             .enumerated()
             .sorted { ($0.element.fit, $0.offset) < ($1.element.fit, $1.offset) }
             .map(\.element)
