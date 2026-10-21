@@ -88,3 +88,7 @@ Layout:
 
 Rewrite modes, inline underlines, passive badges, settings window, configurable hotkey,
 auto-update.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
