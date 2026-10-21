@@ -1,0 +1,43 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check tag matches Version.swift
+        run: |
+          VERSION=$(scripts/version.sh)
+          if [ "v$VERSION" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match version $VERSION in Sources/ProofMateCore/Version.swift" >&2
+            exit 1
+          fi
+
+      - name: Unit tests
+        run: swift test
+
+      - name: Build universal app
+        run: UNIVERSAL=1 BUILD_NUMBER=${{ github.run_number }} scripts/bundle.sh
+
+      - name: Package DMG
+        run: scripts/make-dmg.sh
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(scripts/version.sh)
+          gh release create "$GITHUB_REF_NAME" \
+            "build/ProofMate-$VERSION.dmg" \
+            "build/ProofMate-$VERSION.dmg.sha256" \
+            --title "ProofMate $VERSION" \
+            --notes-file .github/release-notes.md \
+            --generate-notes
