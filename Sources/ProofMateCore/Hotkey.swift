@@ -53,6 +53,12 @@ public struct Hotkey: Codable, Equatable, Sendable {
         return Hotkey(keyCode: UInt32(keyCode), carbonModifiers: modifiers, key: label)
     }
 
+    /// True when Command, Control, or Option is set and the key label is not empty.
+    /// A hand-edited settings file could hold a bare or Shift-only key, which would hijack typing.
+    public var isValid: Bool {
+        carbonModifiers & (Self.cmd | Self.control | Self.option) != 0 && !key.isEmpty
+    }
+
     /// Modifiers in the standard macOS order (⌃⌥⇧⌘), then the key.
     public var displayString: String {
         var text = ""

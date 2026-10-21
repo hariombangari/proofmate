@@ -54,4 +54,10 @@ final class HotkeyTests: XCTestCase {
         let data = try JSONEncoder().encode(original)
         XCTAssertEqual(try JSONDecoder().decode(Hotkey.self, from: data), original)
     }
+
+    func testIsValid() {
+        XCTAssertTrue(Hotkey.defaultCheck.isValid)
+        XCTAssertFalse(Hotkey(keyCode: 5, carbonModifiers: 512, key: "G").isValid)
+        XCTAssertFalse(Hotkey(keyCode: 5, carbonModifiers: 256, key: "").isValid)
+    }
 }

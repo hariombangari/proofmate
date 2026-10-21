@@ -4,11 +4,21 @@ public struct Settings: Codable, Equatable {
     public var model: String
     public var endpoint: URL
     public var timeoutSeconds: Double
+    public var hotkey: Hotkey
+    public var hasCompletedOnboarding: Bool
 
-    public init(model: String, endpoint: URL, timeoutSeconds: Double) {
+    public init(
+        model: String,
+        endpoint: URL,
+        timeoutSeconds: Double,
+        hotkey: Hotkey = .defaultCheck,
+        hasCompletedOnboarding: Bool = false
+    ) {
         self.model = model
         self.endpoint = endpoint
         self.timeoutSeconds = timeoutSeconds
+        self.hotkey = hotkey
+        self.hasCompletedOnboarding = hasCompletedOnboarding
     }
 
     public static let defaults = Settings(
@@ -25,7 +35,7 @@ public struct Settings: Codable, Equatable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case model, endpoint, timeoutSeconds
+        case model, endpoint, timeoutSeconds, hotkey, hasCompletedOnboarding
     }
 
     public init(from decoder: Decoder) throws {
@@ -34,6 +44,19 @@ public struct Settings: Codable, Equatable {
         model = try c.decodeIfPresent(String.self, forKey: .model) ?? d.model
         endpoint = try c.decodeIfPresent(URL.self, forKey: .endpoint) ?? d.endpoint
         timeoutSeconds = try c.decodeIfPresent(Double.self, forKey: .timeoutSeconds) ?? d.timeoutSeconds
+        let decodedHotkey = try c.decodeIfPresent(Hotkey.self, forKey: .hotkey) ?? d.hotkey
+        hotkey = decodedHotkey.isValid ? decodedHotkey : d.hotkey
+        hasCompletedOnboarding = try c.decodeIfPresent(Bool.self, forKey: .hasCompletedOnboarding)
+            ?? d.hasCompletedOnboarding
+    }
+
+    /// Accepts a full http(s) URL with a host, e.g. "http://localhost:11434". Trims whitespace.
+    public static func parseEndpoint(_ text: String) -> URL? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let url = URL(string: trimmed),
+              let scheme = url.scheme?.lowercased(), ["http", "https"].contains(scheme),
+              let host = url.host, !host.isEmpty else { return nil }
+        return url
     }
 
     /// Returns defaults when the file does not exist. Throws on unreadable or invalid JSON.
