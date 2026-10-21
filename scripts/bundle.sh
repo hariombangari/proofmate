@@ -1,15 +1,26 @@
 #!/bin/bash
-# Builds a release binary and wraps it in build/ProofMate.app, ad-hoc signed.
+# Builds a release binary and wraps it in build/ProofMate.app.
+#   UNIVERSAL=1     build arm64 + x86_64 (the release workflow sets this)
+#   BUILD_NUMBER=n  CFBundleVersion (defaults to 1)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-swift build -c release --product ProofMate
+VERSION=$(scripts/version.sh)
+ARCH_FLAGS=()
+if [ "${UNIVERSAL:-0}" = "1" ]; then
+    ARCH_FLAGS=(--arch arm64 --arch x86_64)
+fi
+# bash 3.2 (macOS default) treats an empty array as unbound under `set -u`; this form is safe.
+swift build -c release --product ProofMate ${ARCH_FLAGS[@]+"${ARCH_FLAGS[@]}"}
+BIN_DIR=$(swift build -c release ${ARCH_FLAGS[@]+"${ARCH_FLAGS[@]}"} --show-bin-path)
 
 APP="build/ProofMate.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS"
-cp ".build/release/ProofMate" "$APP/Contents/MacOS/ProofMate"
+cp "$BIN_DIR/ProofMate" "$APP/Contents/MacOS/ProofMate"
 cp "Resources/Info.plist" "$APP/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$APP/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${BUILD_NUMBER:-1}" "$APP/Contents/Info.plist"
 
 # Prefer a local self-signed "ProofMate Dev" identity: its designated requirement is
 # stable across rebuilds, so the Accessibility grant survives. Ad-hoc signatures change
@@ -22,5 +33,4 @@ else
     codesign --force --sign - "$APP"
 fi
 
-echo "Built $APP"
-echo "Run with: open $APP"
+echo "Built $APP $VERSION ($(lipo -archs "$APP/Contents/MacOS/ProofMate"))"
