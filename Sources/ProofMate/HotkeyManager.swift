@@ -6,7 +6,7 @@ import ProofMateCore
 final class HotkeyManager {
     enum HotkeyError: Error { case installHandler(OSStatus), register(OSStatus) }
 
-    var onPress: (() -> Void)?
+    var onPress: (@MainActor () -> Void)?
 
     private var hotKeyRef: EventHotKeyRef?
     private var handlerRef: EventHandlerRef?
@@ -41,7 +41,8 @@ final class HotkeyManager {
             { _, _, userData -> OSStatus in
                 guard let userData else { return noErr }
                 let manager = Unmanaged<HotkeyManager>.fromOpaque(userData).takeUnretainedValue()
-                manager.onPress?()
+                // Carbon delivers application-target events on the main thread.
+                MainActor.assumeIsolated { manager.onPress?() }
                 return noErr
             },
             1, &spec, selfPtr, &handlerRef

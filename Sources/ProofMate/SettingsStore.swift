@@ -33,7 +33,23 @@ final class SettingsStore: ObservableObject {
             return try Settings.load(from: url)
         } catch {
             log.error("settings load failed, using defaults: \(String(describing: error))")
+            backUpUnreadable(at: url)
+            try? Settings.defaults.save(to: url)
             return .defaults
+        }
+    }
+
+    /// Moves an unreadable settings file aside so the defaults never overwrite hand edits.
+    private static func backUpUnreadable(at url: URL) {
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: url.path) else { return }
+        let backup = url.appendingPathExtension("bak")
+        do {
+            if fm.fileExists(atPath: backup.path) { try fm.removeItem(at: backup) }
+            try fm.moveItem(at: url, to: backup)
+            log.error("unreadable settings moved to \(backup.path, privacy: .public)")
+        } catch {
+            log.error("settings backup failed: \(String(describing: error))")
         }
     }
 }
