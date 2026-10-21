@@ -76,6 +76,7 @@ final class SetupModel: ObservableObject {
         pollAccessibility()
         launchAtLogin = SMAppService.mainApp.status == .enabled
         if launchAtLogin { launchAtLoginError = nil }
+        hotkeyVerified = false
         pollTimer?.invalidate()
         pollTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.pollAccessibility() }

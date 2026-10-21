@@ -29,6 +29,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let menu = NSMenu()
         menu.delegate = self
         statusItem.menu = menu
+        menuNeedsUpdate(menu)
+        NSApp.mainMenu = makeMainMenu()
 
         hotkey.onPress = { [weak self] in self?.hotkeyPressed() }
         _ = registerHotkey(store.settings.hotkey)
@@ -52,7 +54,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func hotkeyPressed() {
-        if setup.isVisible {
+        if setup.isFrontmost {
             setup.hotkeyPressed()
         } else {
             coordinator.checkSelection()
@@ -70,6 +72,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(item("Settings…", #selector(openSetup), key: ","))
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quit ProofMate", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+    }
+
+    /// An accessory app has no main menu by default, so edit shortcuts (⌘C, ⌘V, ⌘W…) would not
+    /// reach the setup window's text field. The menu bar stays hidden for LSUIElement apps.
+    private func makeMainMenu() -> NSMenu {
+        let main = NSMenu()
+        let appItem = NSMenuItem()
+        appItem.submenu = NSMenu(title: "ProofMate")
+        main.addItem(appItem)
+
+        let edit = NSMenu(title: "Edit")
+        edit.addItem(withTitle: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
+        let redo = edit.addItem(withTitle: "Redo", action: Selector(("redo:")), keyEquivalent: "z")
+        redo.keyEquivalentModifierMask = [.command, .shift]
+        edit.addItem(.separator())
+        edit.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        edit.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        edit.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        edit.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        edit.addItem(.separator())
+        edit.addItem(withTitle: "Close Window", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+        let editItem = NSMenuItem()
+        editItem.submenu = edit
+        main.addItem(editItem)
+        return main
     }
 
     private func item(_ title: String, _ action: Selector, key: String = "") -> NSMenuItem {

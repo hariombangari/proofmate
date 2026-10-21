@@ -127,6 +127,9 @@ struct ShortcutSection: View {
                 Button(model.isRecordingHotkey ? "Press keys… (esc cancels)" : model.settings.hotkey.displayString) {
                     if model.isRecordingHotkey { model.stopRecording() } else { model.startRecording() }
                 }
+                .accessibilityLabel(model.isRecordingHotkey
+                    ? "Recording shortcut. Press keys or Escape to cancel."
+                    : "Shortcut \(model.settings.hotkey.displayString). Click to change.")
             }
             if let error = model.hotkeyError {
                 Text(error).font(.caption).foregroundStyle(.red)

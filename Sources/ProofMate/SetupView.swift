@@ -4,6 +4,11 @@ struct SetupView: View {
     @ObservedObject var model: SetupModel
     let onDone: () -> Void
 
+    /// First run requires steps 1–3. In settings mode Done only closes the window.
+    private var mustFinishSteps: Bool {
+        !model.settings.hasCompletedOnboarding && !model.isReady
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             Form {
@@ -18,7 +23,7 @@ struct SetupView: View {
 
             Divider()
             HStack {
-                if !model.isReady {
+                if mustFinishSteps {
                     Text("Finish steps 1–3 to start using ProofMate.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
@@ -26,7 +31,7 @@ struct SetupView: View {
                 Spacer()
                 Button("Done", action: onDone)
                     .keyboardShortcut(.defaultAction)
-                    .disabled(!model.isReady)
+                    .disabled(mustFinishSteps)
             }
             .padding(12)
         }
