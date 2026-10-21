@@ -12,7 +12,7 @@ final class HotkeyManager {
     private static let signature: OSType = 0x504D_484B // "PMHK"
 
     func register(keyCode: UInt32 = UInt32(kVK_ANSI_G),
-                  modifiers: UInt32 = UInt32(cmdKey | shiftKey)) throws {
+                  modifiers: UInt32 = UInt32(controlKey | optionKey)) throws {
         var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard),
                                  eventKind: UInt32(kEventHotKeyPressed))
         let selfPtr = Unmanaged.passUnretained(self).toOpaque()

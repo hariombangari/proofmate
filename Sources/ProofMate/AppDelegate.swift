@@ -42,7 +42,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func makeMenu() -> NSMenu {
         let menu = NSMenu()
         menu.addItem(withTitle: "ProofMate \(ProofMateVersion.current)", action: nil, keyEquivalent: "")
-        menu.addItem(withTitle: "Check Selection  ⌘⇧G", action: nil, keyEquivalent: "")
+        menu.addItem(withTitle: "Check Selection  ⌃⌥G", action: nil, keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         return menu
