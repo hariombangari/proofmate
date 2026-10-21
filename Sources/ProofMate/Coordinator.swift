@@ -3,15 +3,19 @@ import ProofMateCore
 
 @MainActor
 final class Coordinator {
-    private let engine: CorrectionEngine
-    private let settings: Settings
+    private let store: SettingsStore
+    private let openSetup: () -> Void
     private let popover = PopoverController()
     private var lastOriginal: String?
     private var lastCorrected: String?
 
-    init(engine: CorrectionEngine, settings: Settings) {
-        self.engine = engine
-        self.settings = settings
+    /// Built per check so edits in the setup window apply immediately.
+    private var engine: CorrectionEngine { OllamaEngine(settings: store.settings) }
+    private var settings: Settings { store.settings }
+
+    init(store: SettingsStore, openSetup: @escaping () -> Void) {
+        self.store = store
+        self.openSetup = openSetup
         popover.onReturn = { [weak self] in self?.apply() }
         popover.onCopy = { [weak self] in self?.copy() }
     }
@@ -26,7 +30,10 @@ final class Coordinator {
         guard TextCapture.ensureAccessibility(prompt: true) else {
             popover.show(.error(
                 message: "ProofMate needs Accessibility access to read the selected text.",
-                action: ErrorAction(title: "Open System Settings") { TextCapture.openAccessibilitySettings() }
+                action: ErrorAction(title: "Open Setup") { [weak self] in
+                    self?.popover.hide()
+                    self?.openSetup()
+                }
             ))
             return
         }
@@ -122,8 +129,11 @@ final class Coordinator {
             )
         case .modelMissing(let model):
             return .error(
-                message: "Model \"\(model)\" is not pulled. Run:  ollama pull \(model)",
-                action: retry
+                message: "Model \"\(model)\" is not installed. Pick an installed model or run:  ollama pull \(model)",
+                action: ErrorAction(title: "Open Setup") { [weak self] in
+                    self?.popover.hide()
+                    self?.openSetup()
+                }
             )
         case .timeout:
             return .error(message: "The model took longer than \(Int(settings.timeoutSeconds))s.", action: retry)

@@ -1,5 +1,6 @@
 import Carbon
 import Foundation
+import ProofMateCore
 
 /// Registers one system-wide hotkey and calls `onPress` on the main thread.
 final class HotkeyManager {
@@ -11,13 +12,31 @@ final class HotkeyManager {
     private var handlerRef: EventHandlerRef?
     private static let signature: OSType = 0x504D_484B // "PMHK"
 
-    func register(keyCode: UInt32 = UInt32(kVK_ANSI_G),
-                  modifiers: UInt32 = UInt32(controlKey | optionKey)) throws {
+    /// Replaces any previously registered shortcut.
+    func register(_ hotkey: Hotkey) throws {
+        try installHandlerIfNeeded()
+        unregister()
+        let hotKeyID = EventHotKeyID(signature: Self.signature, id: 1)
+        let status = RegisterEventHotKey(
+            hotkey.keyCode, hotkey.carbonModifiers, hotKeyID, GetApplicationEventTarget(), 0, &hotKeyRef
+        )
+        guard status == noErr else {
+            hotKeyRef = nil
+            throw HotkeyError.register(status)
+        }
+    }
+
+    func unregister() {
+        if let hotKeyRef { UnregisterEventHotKey(hotKeyRef) }
+        hotKeyRef = nil
+    }
+
+    private func installHandlerIfNeeded() throws {
+        guard handlerRef == nil else { return }
         var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard),
                                  eventKind: UInt32(kEventHotKeyPressed))
         let selfPtr = Unmanaged.passUnretained(self).toOpaque()
-
-        let installStatus = InstallEventHandler(
+        let status = InstallEventHandler(
             GetApplicationEventTarget(),
             { _, _, userData -> OSStatus in
                 guard let userData else { return noErr }
@@ -27,17 +46,11 @@ final class HotkeyManager {
             },
             1, &spec, selfPtr, &handlerRef
         )
-        guard installStatus == noErr else { throw HotkeyError.installHandler(installStatus) }
-
-        let hotKeyID = EventHotKeyID(signature: Self.signature, id: 1)
-        let registerStatus = RegisterEventHotKey(
-            keyCode, modifiers, hotKeyID, GetApplicationEventTarget(), 0, &hotKeyRef
-        )
-        guard registerStatus == noErr else { throw HotkeyError.register(registerStatus) }
+        guard status == noErr else { throw HotkeyError.installHandler(status) }
     }
 
     deinit {
-        if let hotKeyRef { UnregisterEventHotKey(hotKeyRef) }
+        unregister()
         if let handlerRef { RemoveEventHandler(handlerRef) }
     }
 }
