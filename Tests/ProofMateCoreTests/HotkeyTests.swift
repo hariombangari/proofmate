@@ -19,6 +19,12 @@ final class HotkeyTests: XCTestCase {
         XCTAssertEqual(hotkey.displayString, "⇧⌘G")
     }
 
+    func testControlOptionMapsWithoutCommand() throws {
+        let hotkey = try XCTUnwrap(Hotkey.fromCocoa(keyCode: 5, cocoaFlags: control | option, characters: "g"))
+        XCTAssertEqual(hotkey.carbonModifiers, 4096 | 2048) // controlKey | optionKey
+        XCTAssertEqual(hotkey, Hotkey.defaultCheck)
+    }
+
     func testAllModifiersDisplayInMacOrder() throws {
         let hotkey = try XCTUnwrap(Hotkey.fromCocoa(
             keyCode: 40, cocoaFlags: command | shift | option | control, characters: "k"))

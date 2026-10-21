@@ -1,7 +1,7 @@
 import Foundation
 
 /// A global shortcut stored as a Carbon key code plus Carbon modifier flags.
-public struct Hotkey: Codable, Equatable {
+public struct Hotkey: Codable, Equatable, Sendable {
     public var keyCode: UInt32
     public var carbonModifiers: UInt32
     /// The key's label when recorded, e.g. "G". Display only.
@@ -36,6 +36,9 @@ public struct Hotkey: Codable, Equatable {
 
     /// Builds a hotkey from an AppKit key event. Returns nil unless Command, Control, or
     /// Option is held: Shift-only or bare keys would hijack normal typing.
+    ///
+    /// Pass `NSEvent.charactersIgnoringModifiers` as `characters`. `NSEvent.characters`
+    /// applies the modifiers, so ⌥G gives "©" and ⌃G gives a control character.
     public static func fromCocoa(keyCode: UInt16, cocoaFlags: UInt, characters: String) -> Hotkey? {
         var modifiers: UInt32 = 0
         if cocoaFlags & cocoaCommand != 0 { modifiers |= cmd }
